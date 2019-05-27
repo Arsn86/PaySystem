@@ -19,6 +19,8 @@ public class DBServiceImpl implements DBService {
     private final ConnHelper connHelper;
 
     private final static String CREATE_TABLE_ACCOUNTS = "create table if not exists `accounts` (id bigint auto_increment, balance int(11) unsigned not null, primary key (id));";
+    private final static String CREATE_TABLE_ACCOUNT_HISTORY = "create table if not exists `account_history` (id bigint auto_increment, account_id int(11)" +
+            ", dt datetime, amount int(11),type int(1),result tinyint, transaction_id bigint, primary key (id));";
 
     private final static String INSERT_ACCOUNT = "insert into accounts (balance) values (?)";
     private final static String INSERT_MAIN_ACCOUNT = "insert into accounts (id, balance) values (?,?)";
@@ -27,7 +29,8 @@ public class DBServiceImpl implements DBService {
     private final static String SELECT_ACCOUNTS = "select * from accounts";
     private final static String SELECT_ACCOUNTS_COUNT = "select count(*) from accounts";
 
-    private final static String DROP_TABLE_ACCOUNTS  = "DROP TABLE if exists `accounts`;";
+    private final static String DROP_TABLE_ACCOUNTS = "DROP TABLE if exists `accounts`;";
+    private final static String DROP_TABLE_ACCOUNT_HISTORY = "DROP TABLE if exists `account_history`;";
 
     public DBServiceImpl() {
         connHelper = new ConnHelper();
@@ -107,6 +110,7 @@ public class DBServiceImpl implements DBService {
     public void createTables() throws SQLException {
         Executor executor = new Executor(connection);
         executor.execQuery(CREATE_TABLE_ACCOUNTS);
+        executor.execQuery(CREATE_TABLE_ACCOUNT_HISTORY);
         //connHelper.closeConnection();
     }
 
@@ -114,6 +118,7 @@ public class DBServiceImpl implements DBService {
     public void dropTables() throws SQLException {
         Executor executor = new Executor(connection);
         executor.execQuery(DROP_TABLE_ACCOUNTS);
+        executor.execQuery(DROP_TABLE_ACCOUNT_HISTORY);
         //connHelper.closeConnection();
     }
 

@@ -3,6 +3,7 @@ package ru.dz.pay.system.helpers.database;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import ru.dz.pay.system.helpers.Trw;
 
 import java.util.List;
 
@@ -37,6 +38,16 @@ public class AccountServiceImpl implements AccountService {
     @Override
     public long getAllBalance() {
         return accountDao.getAllBalance();
+    }
+
+    @Override
+    public boolean updateAccountHistory(int id, long dt, int amount, int type, boolean result, long transactionId) {
+        return accountDao.updateAccountHistory(id, dt, amount, type, result, transactionId);
+    }
+
+    @Override
+    public int updateAccountHistory(List<Trw> list) {
+        return accountDao.updateAccountHistory(list);
     }
 
     @Override

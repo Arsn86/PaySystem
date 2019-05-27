@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration monitorInterval="60" packages="">
+
+    <Properties>
+
+    </Properties>
+
+    <!-- Секция аппендеров -->
+    <Appenders>
+        <RollingFile name="Loader" fileName="logs/Loader.${date:dd.MM.yyyy_HHmm}.log"
+                     filePattern="logs/old/Loader-%d{dd.MM.yyyy-HH}.%i.log.gz" ignoreExceptions="true"
+                     immediateFlush="true" createOnDemand="true">
+            <PatternLayout>
+                <Pattern>%d %p %c{1.} [%t] %m %ex%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <OnStartupTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+                <TimeBasedTriggeringPolicy interval="60" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30" compressionLevel="9"/>
+        </RollingFile>
+        <RollingFile name="file_warn" fileName="logs/file_warn.${date:dd.MM.yyyy}.log"
+                     filePattern="logs/old/file_warn-%d{dd.MM.yyyy-HH}.%i.log.gz" createOnDemand="true">
+            <PatternLayout>
+                <Pattern>%d %p %c{1.} [%t] %m %ex%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <OnStartupTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+                <TimeBasedTriggeringPolicy interval="60" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30" compressionLevel="9"/>
+        </RollingFile>
+        <Console name="STDOUT" target="SYSTEM_OUT">
+            <PatternLayout>
+                <Pattern>[%d] %m %n</Pattern>
+            </PatternLayout>
+        </Console>
+        <Async name="Loader_Async">
+            <AppenderRef ref="Loader"/>
+            <LinkedTransferQueue/>
+        </Async>
+    </Appenders>
+    <!-- Секция логгеров -->
+    <Loggers>
+        <!-- Корневой логгер -->
+        <Root level="INFO">
+            <AppenderRef ref="file_warn" level="INFO"/>
+            <AppenderRef ref="STDOUT" level="INFO"/>
+        </Root>
+        <!-- Логгер класса -->
+        <Logger name="ru.dz.pay.system.Client" level="INFO" additivity="true">
+            <AppenderRef ref="Loader" level="INFO"/>
+            <AppenderRef ref="STDOUT" level="INFO"/>
+        </Logger>
+    </Loggers>
+</Configuration> 

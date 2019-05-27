@@ -1,5 +1,7 @@
 package ru.dz.pay.system.helpers;
 
+import ru.dz.pay.system.helpers.database.ConnectionSettings;
+
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
@@ -7,10 +9,12 @@ import java.sql.SQLException;
 
 public class ConnHelper {
 
+    private ConnectionSettings connectionSettings = new ConnectionSettings();
+
     private Connection connection;
 
     public Connection getConnection() {
-        String url = "jdbc:mysql://192.168.31.13:3306/test?user=user&password=afga4eg5sSd4Q&serverTimezone=UTC&useSSL=false";
+        String url = connectionSettings.getJdbcString() + "&user=" + connectionSettings.getJdbcUser() + "&password=" + connectionSettings.getJdbcPassword();
 
         try {
             //Driver driver = (Driver) Class.forName("com.mysql.cj.jdbc.Driver").getConstructor().newInstance();

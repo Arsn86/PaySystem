@@ -2,8 +2,12 @@ package ru.dz.pay.system;
 
 import com.google.gson.Gson;
 import lombok.ToString;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.Before;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
+import org.junit.runners.MethodSorters;
 import ru.dz.pay.system.helpers.FileManager;
 import ru.dz.pay.system.helpers.data.AccountsDataSet;
 import ru.dz.pay.system.helpers.dbs.DBService;
@@ -27,7 +31,10 @@ import static junit.framework.TestCase.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class CheckServer {
+
+    private static final Logger log = LogManager.getLogger(CheckServer.class);
 
     private Client client = new Client();
     private static final long mainBalance = 1000000;
@@ -75,7 +82,7 @@ public class CheckServer {
 
             AccountsDataSet accFromDB = dbService.load(2, AccountsDataSet.class);
 
-            System.out.println("Account 2 FromDB: " + accFromDB);
+            log.info("Account 2 FromDB: " + accFromDB);
 
             for (int i = 4; i <= maxAccId; i++) {
                 dbService.save(new AccountsDataSet(100));
@@ -85,7 +92,7 @@ public class CheckServer {
 
             list.forEach(System.out::println);
 
-            System.out.println("Count: " + dbService.getCount());
+            log.info("Count: " + dbService.getCount());
 
             init = true;
 
@@ -101,11 +108,10 @@ public class CheckServer {
         index.set(5);
         map.clear();
         client.init();
-        //init();
     }
 
     @Test
-    public void shutdownServerManager() throws IOException {
+    public void t01_shutdownServerManager() throws IOException {
         TransactionRequest request = new TransactionRequest();
         HttpResp resp = client.send(MessageType.GET, "payment/stop", request);
         assertTrue(resp.isOk());
@@ -113,7 +119,7 @@ public class CheckServer {
     }
 
     @Test
-    public void checkServerStatus() throws IOException {
+    public void t02_checkServerStatus() throws IOException {
         if (!init) init();
         TransactionRequest request = new TransactionRequest();
         HttpResp resp = client.send(MessageType.GET, "payment", request);
@@ -122,7 +128,7 @@ public class CheckServer {
     }
 
     @Test
-    public void checkPost() throws IOException {
+    public void t03_checkPost() throws IOException {
 
         long transactionId = 888;
         TransactionRequest request = new TransactionRequest();
@@ -139,99 +145,6 @@ public class CheckServer {
             assertFalse(response.isResult());
         }
         assertTrue(resp.isOk());
-    }
-
-    @Test
-    public void checkPostLoad() {
-
-        long start = System.currentTimeMillis();
-        int loopCount = 10000;
-        int startIndex = 5;
-        Random random = new Random();
-        String strategyName = "payment/pay";
-
-        FileManager manager = FileManager.getInstance();
-        manager.init("load");
-
-        for (int i = 0; i < loopCount; i++) {
-            map.put(getNextTransactionId(transactionIndexDiff), new Counter());
-        }
-
-        Runnable runnable = () -> {
-            while (index.get() < loopCount + startIndex) {
-
-                System.out.println(format("Index: %s, count: %s", index.get(), loopCount + startIndex));
-
-                try {
-                    TransactionRequest request = getNewRequest(randomAccountId ? random.nextInt(maxAccId) + 1 : 5, 0);
-                    long id = request.getTransactionId();
-                    System.out.println("request: " + request);
-                    map.get(id).out.incrementAndGet();
-                    HttpResp resp = client.send(MessageType.POST, strategyName, request);
-                    TransactionResponse response;
-                    assertNotNull(resp.getBody());
-                    manager.writeString("request: " + request + " -> " + resp);
-                    if (resp.getBody() != null && resp.getBody().length() > 0) {
-                        response = new Gson().fromJson(resp.getBody(), TransactionResponse.class);
-                        manager.writeString("request: " + request + " -> " + response);
-                        Counter counter = map.get(response.getTransactionId());
-                        counter.in.incrementAndGet();
-                        counter.time = response.getDateTime() - request.getDateTime();
-                        assertEquals(id, response.getTransactionId());
-                        assertTrue(response.isResult());
-                    }
-                    assertTrue(resp.isOk());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        };
-
-        long end = System.currentTimeMillis() - start;
-        System.out.println("Map initialized! Time: " + end);
-
-        index.set(startIndex);
-
-        ExecutorService service = Executors.newFixedThreadPool(threadPoolSize);
-
-        for (int i = 0; i < threadPoolSize; i++) {
-            service.submit(runnable);
-        }
-
-        try {
-            service.shutdown();
-            service.awaitTermination(10, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        while (!service.isTerminated()) {
-            Thread.yield();
-        }
-
-        end = System.currentTimeMillis() - start - end;
-
-        manager.close();
-
-        AtomicLong max = new AtomicLong(0);
-        AtomicLong errCount = new AtomicLong();
-
-        map.forEach((k, v) -> {
-            try {
-                assertEquals(1, v.in.intValue());
-                assertEquals(1, v.out.intValue());
-                assertTrue(v.time < maxLatency);
-            } catch (AssertionError e) {
-                System.out.println(format("Err #%s | Check: k = %s : v = %s, Latency: %s | AssertionError: %s", errCount.incrementAndGet(), k, v, v.time, e));
-                e.printStackTrace();
-            }
-            if (max.get() < v.time) max.set(v.time);
-        });
-
-        System.out.println(format("Load complete! Time: %s, (max latency: %s)| Count: %s (TPS=%s) | Errors = %s", end, max.get(), loopCount, loopCount * 1000 / end, errCount.get()));
-
-        assertEquals(0, errCount.get());
-
     }
 
     private TransactionRequest getNewRequest(int id, int amount) {
@@ -254,9 +167,13 @@ public class CheckServer {
     }
 
     @Test
-    public void setBalance() throws IOException {
+    public void t04_setBalance() throws IOException {
+
+        t01_shutdownServerManager();
 
         init();
+
+        t02_checkServerStatus();
 
         for (int i = 1; i <= 2; i++) {
 
@@ -295,7 +212,7 @@ public class CheckServer {
 
             list.forEach(System.out::println);
 
-            System.out.println("Count: " + dbService.getCount());
+            log.info("Count: " + dbService.getCount());
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -304,7 +221,7 @@ public class CheckServer {
     }
 
     @Test
-    public void showBalance() {
+    public void t05_showBalance() {
         assertTrue(checkBalance() > mainBalance);
     }
 
@@ -319,10 +236,10 @@ public class CheckServer {
     }
 
     @Test
-    public void transferBalance() throws IOException {
-        init();
+    public void t06_transferBalance() throws IOException {
+        //init();
         long startBalance = checkBalance();
-        System.out.println("Initial balance = " + startBalance);
+        log.info("Initial balance = " + startBalance);
 
         TransactionRequest request = getNewRequest(3, 20);
         request.setType(12);
@@ -367,7 +284,7 @@ public class CheckServer {
 
         long endBalance = checkBalance();
         assertEquals(startBalance, endBalance);
-        System.out.println("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
+        log.info("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
     }
 
     private long getNextTransactionId() {
@@ -379,17 +296,15 @@ public class CheckServer {
     }
 
     @Test
-    public void transferBalanceFast() throws IOException, InterruptedException {
+    public void t07_transferBalanceFast() throws IOException, InterruptedException {
 
-        shutdownServerManager();
-
-        init();
-        checkServerStatus();
+        t01_shutdownServerManager();
+        t02_checkServerStatus();
 
         Thread.sleep(1600);
 
         long startBalance = checkBalance();
-        System.out.println("Initial balance = " + startBalance);
+        log.info("Initial balance = " + startBalance);
 
         TransactionRequest request = getNewRequest(3, 20);
         request.setType(12);
@@ -435,27 +350,50 @@ public class CheckServer {
         Thread.sleep(1600);
 
         long endBalance = checkBalance();
-        System.out.println("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
+        log.info("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
         assertEquals(startBalance, endBalance);
     }
 
     @Test
-    public void transferBalanceLoadPay() throws InterruptedException {
+    public void t08_setServerStatusSync() throws IOException {
+        TransactionRequest request = new TransactionRequest();
+        HttpResp resp = client.send(MessageType.GET, "payment/sync", request);
+        assertTrue(resp.isOk());
+        assertEquals("OK, Manager sync state!", resp.getBody());
+    }
+
+    @Test
+    public void t09_setServerStatusAsync() throws IOException {
+        TransactionRequest request = new TransactionRequest();
+        HttpResp resp = client.send(MessageType.GET, "payment/async", request);
+        assertTrue(resp.isOk());
+        assertEquals("OK, Manager async state!", resp.getBody());
+    }
+
+    @Test
+    public void t10_transferBalanceLoadPay() throws InterruptedException {
         transferBalanceLoad("payment/pay", 10000, false);
     }
 
     @Test
-    public void transferBalanceLoadWdb() throws InterruptedException {
+    public void t11_transferBalanceLoadWdb() throws InterruptedException {
         transferBalanceLoad("payment/wdb", 10000, false);
     }
 
     @Test
-    public void transferBalanceLoadFast() throws InterruptedException {
+    public void t12_transferBalanceLoadFast() throws InterruptedException {
         transferBalanceLoad("payment/fast", 10000, false);
     }
 
     @Test
-    public void transferBalanceLoadTest() throws IOException, InterruptedException {
+    public void t13_transferBalanceLoadDbt() throws InterruptedException, IOException {
+        t08_setServerStatusSync();
+        transferBalanceLoad("payment/dbt", 10000, false);
+        t09_setServerStatusAsync();
+    }
+
+    @Test
+    public void t15_transferBalanceLoadTest() throws IOException, InterruptedException {
         randomAccountId = false;
         transferBalanceAll();
     }
@@ -463,35 +401,46 @@ public class CheckServer {
     private void transferBalanceAll() throws IOException, InterruptedException {
         init = true;
 
-        checkServerStatus();
+        t02_checkServerStatus();
 
         int loopCount = 10000;
 
         long startBalance = checkBalance();
-        System.out.println("Initial balance = " + startBalance);
+        log.info("Initial balance = " + startBalance);
 
         String pay = transferBalanceLoad("payment/pay", loopCount, true);
 
         index.set(5);
         map.clear();
         client.init();
-        checkServerStatus();
+        t02_checkServerStatus();
         String wdb = transferBalanceLoad("payment/wdb", loopCount, true);
 
         index.set(5);
         map.clear();
         client.init();
-        checkServerStatus();
+        t01_shutdownServerManager();
+        t02_checkServerStatus();
         String fast = transferBalanceLoad("payment/fast", loopCount, true);
 
+        index.set(5);
+        map.clear();
+        client.init();
+        t01_shutdownServerManager();
+        t02_checkServerStatus();
+        t08_setServerStatusSync();
+        String dbt = transferBalanceLoad("payment/dbt", loopCount, true);
+        t09_setServerStatusAsync();
+
         long endBalance = checkBalance();
-        System.out.println("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
-        System.out.println("============================================================================================\nPAY:\n" + pay + "\nWDB:\n" + wdb + "\nFAST:\n" + fast);
+        log.info("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
+        log.info("============================================================================================\n" +
+                "PAY:\n" + pay + "\nWDB:\n" + wdb + "\nFAST:\n" + fast+ "\nDBT:\n" + dbt);
         assertEquals(startBalance, endBalance);
     }
 
     @Test
-    public void transferBalanceLoadTestRandom() throws IOException, InterruptedException {
+    public void t16_transferBalanceLoadTestRandom() throws IOException, InterruptedException {
         randomAccountId = true;
         transferBalanceAll();
     }
@@ -505,7 +454,7 @@ public class CheckServer {
         Random random = new Random();
 
         long startBalance = checkBalance();
-        System.out.println("Initial balance = " + startBalance);
+        log.info("Initial balance = " + startBalance);
 
         for (int i = 0; i < loopCount; i++) {
             map.put(getNextTransactionId(transactionIndexDiff), new Counter());
@@ -514,16 +463,16 @@ public class CheckServer {
         FileManager manager = FileManager.getInstance();
         manager.init(strategyName.substring(strategyName.length() - 3));
 
-        /*System.out.println("MAP:");
+        /*log.info("MAP:");
         map.forEach((k, v) -> {
-            System.out.println(k);
+            log.info(k);
         });*/
 
         Runnable runnable = () -> {
 
             while (index.get() < loopCount + startIndex) {
 
-                System.out.println(format("Index: %s, count: %s", index.get(), loopCount + startIndex));
+                log.info(format("Index: %s, count: %s", index.get(), loopCount + startIndex));
 
                 long id = 0;
                 HttpResp resp = null;
@@ -532,7 +481,7 @@ public class CheckServer {
                 try {
                     request = getNewRequest(randomAccountId ? random.nextInt(maxAccId) + 1 : 5, random.nextInt(50), random.nextInt(10) < 5 ? 12 : 14);
                     id = request.getTransactionId();
-                    System.out.println("request: " + request);
+                    log.info("request: " + request);
                     map.get(id).out.incrementAndGet();
                     manager.writeString("request: " + request + " -> set out: " + map.get(id).out.get());
                     resp = client.send(MessageType.POST, strategyName, request);
@@ -556,7 +505,7 @@ public class CheckServer {
         };
 
         long end = System.currentTimeMillis() - start;
-        System.out.println("Map initialized! Time: " + end);
+        log.info("Map initialized! Time: " + end);
 
         index.set(startIndex);
 
@@ -593,7 +542,7 @@ public class CheckServer {
             } catch (AssertionError e) {
                 String s = format("Err #%s | Check: k = %s : v = %s, Latency: %s | AssertionError: %s", errCount.incrementAndGet(), k, v, v.time, e);
 
-                System.out.println(s);
+                log.info(s);
                 e.printStackTrace();
             }
             if (max.get() < v.time) max.set(v.time);
@@ -602,12 +551,12 @@ public class CheckServer {
         Thread.sleep(1600);
 
         long endBalance = checkBalance();
-        System.out.println("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
+        log.info("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
         boolean okBalance = endBalance == startBalance;
         String result = format("Load complete! Time: %s, (max latency: %s)| Count: %s (TPS=%s) | Balance is: %s | Errors = %s", end, max.get(), loopCount, loopCount * 1000 / end, okBalance, errCount.get());
         assertEquals(startBalance, endBalance);
 
-        System.out.println(result);
+        log.info(result);
 
         if (!allow) assertEquals(0, errCount.get());
 

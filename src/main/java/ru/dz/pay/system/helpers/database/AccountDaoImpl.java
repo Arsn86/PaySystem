@@ -8,9 +8,13 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import ru.dz.pay.system.TransactionRequest;
+import ru.dz.pay.system.helpers.Trw;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,10 +22,12 @@ import java.util.Optional;
 public class AccountDaoImpl implements AccountDao {
 
     private static final String SELECT_ACCOUNT_ID = "select * from accounts where id = :id";
-    private static final String SELECT_ACCOUNTS = "select * from accounts;";
+    private static final String SELECT_ACCOUNTS = "select * from accounts";
     private static final String UPDATE_ACCOUNT_ID = "update accounts set balance = :balance where id = :id";
+    private static final String UPDATE_ACCOUNT_HISTORY = "insert into account_history (account_id, dt, amount, type, result, transaction_id)" +
+            " values (:account_id,:dt,:amount,:type,:result,:transaction_id)";
     private static final String TRANSFER_BALANCE = "update accounts set balance = balance + :balance where id = :id";
-    private static final String GET_ALL_BALANCE = "select sum(balance) balance from accounts;";
+    private static final String GET_ALL_BALANCE = "select sum(balance) balance from accounts";
 
     private final AccountMapper accountMapper;
     private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -111,6 +117,45 @@ public class AccountDaoImpl implements AccountDao {
         } else {
             return false;
         }
+    }
+
+    @Override
+    public boolean updateAccountHistory(int id, long dt, int amount, int type, boolean result, long transactionId) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("account_id", id);
+        params.addValue("amount", amount);
+        params.addValue("dt", new Date(dt));
+        params.addValue("type", type);
+        params.addValue("result", result);
+        params.addValue("transaction_id", transactionId);
+        DefaultTransactionDefinition paramTransactionDefinition = new DefaultTransactionDefinition();
+        TransactionStatus status = platformTransactionManager.getTransaction(paramTransactionDefinition);
+        int count = jdbcTemplate.update(UPDATE_ACCOUNT_HISTORY, params);
+        platformTransactionManager.commit(status);
+        return count > 0;
+    }
+
+    @Override
+    public int updateAccountHistory(final List<Trw> list) {
+        DefaultTransactionDefinition paramTransactionDefinition = new DefaultTransactionDefinition();
+        TransactionStatus status = platformTransactionManager.getTransaction(paramTransactionDefinition);
+
+        MapSqlParameterSource[] params = new MapSqlParameterSource[list.size()];
+
+        for (int i = 0; i < list.size(); i++) {
+            TransactionRequest request = list.get(i).getRequest();
+            params[i] = new MapSqlParameterSource();
+            params[i].addValue("account_id", request.getAccountId());
+            params[i].addValue("amount", request.getAmount());
+            params[i].addValue("dt", new Date(request.getDateTime()));
+            params[i].addValue("type", request.getType());
+            params[i].addValue("result", list.get(i).isResult());
+            params[i].addValue("transaction_id", request.getTransactionId());
+        }
+
+        int[] count = jdbcTemplate.batchUpdate(UPDATE_ACCOUNT_HISTORY, params);
+        platformTransactionManager.commit(status);
+        return Arrays.stream(count).sum();
     }
 
     @Override
