@@ -1,0 +1,5 @@
+url=http://localhost:8080/
+threadCount=1
+messageCount=8
+requests.connectTimeout=2000
+requests.socketTimeout=4000

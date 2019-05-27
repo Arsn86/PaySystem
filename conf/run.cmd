@@ -1,0 +1,1 @@
+java -cp PaySystem-1.0-SNAPSHOT.jar ru.dz.pay.system.Application

@@ -1,0 +1,16 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            url "https://repository.mulesoft.org/nexus/content/repositories/public"
+        }
+    }
+    dependencies {
+        classpath 'io.franzbecker:gradle-lombok:1.14'
+    }
+}
+
+apply plugin: io.franzbecker.gradle.lombok.LombokPlugin
+lombok {
+    version = "1.16.20"
+}
