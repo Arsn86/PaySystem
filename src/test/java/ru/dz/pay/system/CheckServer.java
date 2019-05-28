@@ -57,6 +57,16 @@ public class CheckServer {
 
     private boolean init = false;
 
+    private class Result {
+        String msg;
+        long err;
+
+        Result(String msg, long err) {
+            this.msg = msg;
+            this.err = err;
+        }
+    }
+
     private void init() {
         Random random = new Random();
 
@@ -372,23 +382,27 @@ public class CheckServer {
 
     @Test
     public void t10_transferBalanceLoadPay() throws InterruptedException {
-        transferBalanceLoad("payment/pay", 10000, false);
+        Result result = transferBalanceLoad("payment/pay", 10000, false);
+        assertEquals(0, result.err);
     }
 
     @Test
     public void t11_transferBalanceLoadWdb() throws InterruptedException {
-        transferBalanceLoad("payment/wdb", 10000, false);
+        Result result = transferBalanceLoad("payment/wdb", 10000, false);
+        assertEquals(0, result.err);
     }
 
     @Test
     public void t12_transferBalanceLoadFast() throws InterruptedException {
-        transferBalanceLoad("payment/fast", 10000, false);
+        Result result = transferBalanceLoad("payment/fast", 10000, false);
+        assertEquals(0, result.err);
     }
 
     @Test
     public void t13_transferBalanceLoadDbt() throws InterruptedException, IOException {
         t08_setServerStatusSync();
-        transferBalanceLoad("payment/dbt", 10000, false);
+        Result result = transferBalanceLoad("payment/dbt", 10000, false);
+        assertEquals(0, result.err);
         t09_setServerStatusAsync();
     }
 
@@ -408,20 +422,20 @@ public class CheckServer {
         long startBalance = checkBalance();
         log.info("Initial balance = " + startBalance);
 
-        String pay = transferBalanceLoad("payment/pay", loopCount, true);
+        Result pay = transferBalanceLoad("payment/pay", loopCount, true);
 
         index.set(5);
         map.clear();
         client.init();
         t02_checkServerStatus();
-        String wdb = transferBalanceLoad("payment/wdb", loopCount, true);
+        Result wdb = transferBalanceLoad("payment/wdb", loopCount, true);
 
         index.set(5);
         map.clear();
         client.init();
         t01_shutdownServerManager();
         t02_checkServerStatus();
-        String fast = transferBalanceLoad("payment/fast", loopCount, true);
+        Result fast = transferBalanceLoad("payment/fast", loopCount, true);
 
         index.set(5);
         map.clear();
@@ -429,14 +443,18 @@ public class CheckServer {
         t01_shutdownServerManager();
         t02_checkServerStatus();
         t08_setServerStatusSync();
-        String dbt = transferBalanceLoad("payment/dbt", loopCount, true);
+        Result dbt = transferBalanceLoad("payment/dbt", loopCount, true);
         t09_setServerStatusAsync();
 
         long endBalance = checkBalance();
         log.info("End balance = " + endBalance + ", startBalance = " + startBalance + " | Diff: " + (endBalance - startBalance));
         log.info("============================================================================================\n" +
-                "PAY:\n" + pay + "\nWDB:\n" + wdb + "\nFAST:\n" + fast+ "\nDBT:\n" + dbt);
+                "PAY:\n" + pay.msg + "\nWDB:\n" + wdb.msg + "\nFAST:\n" + fast.msg + "\nDBT:\n" + dbt.msg);
         assertEquals(startBalance, endBalance);
+        assertEquals(0, pay.err);
+        assertEquals(0, wdb.err);
+        assertEquals(0, fast.err);
+        assertEquals(0, dbt.err);
     }
 
     @Test
@@ -445,7 +463,7 @@ public class CheckServer {
         transferBalanceAll();
     }
 
-    private String transferBalanceLoad(String strategyName, int loopCount, boolean allow) throws InterruptedException {
+    private Result transferBalanceLoad(String strategyName, int loopCount, boolean allow) throws InterruptedException {
 
         Thread.sleep(1600);
 
@@ -560,7 +578,7 @@ public class CheckServer {
 
         if (!allow) assertEquals(0, errCount.get());
 
-        return result;
+        return new Result(result, errCount.get());
 
     }
 
