@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import ru.dz.pay.system.helpers.DbManager;
 import ru.dz.pay.system.helpers.Strategy;
-import ru.dz.pay.system.helpers.database.AccountService;
+import ru.dz.pay.system.database.AccountService;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,10 +21,14 @@ public class PaymentController {
     private static DbManager dbManager = DbManager.getInstance();
     private static final AtomicLong count = new AtomicLong(0);
 
-    @Autowired
     private AccountService service;
 
     private static boolean mapInitiated = false;
+
+    @Autowired
+    public PaymentController(AccountService service) {
+        this.service = service;
+    }
 
     @GetMapping
     public String show() {
@@ -75,11 +79,13 @@ public class PaymentController {
 
     @PostMapping("/fast")
     public TransactionResponse sendFast(@RequestBody TransactionRequest request) {
+        if (!mapInitiated) mapInitiated = initMap();
         return proceed(request, Strategy.FAST);
     }
 
     @PostMapping("/dbt")
     public TransactionResponse sendDbt(@RequestBody TransactionRequest request) {
+        if (!mapInitiated) mapInitiated = initMap();
         return proceed(request, Strategy.DBT);
     }
 

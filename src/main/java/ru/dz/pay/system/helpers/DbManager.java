@@ -3,13 +3,12 @@ package ru.dz.pay.system.helpers;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.dz.pay.system.TransactionRequest;
-import ru.dz.pay.system.helpers.database.Account;
-import ru.dz.pay.system.helpers.database.AccountService;
+import ru.dz.pay.system.database.Account;
+import ru.dz.pay.system.database.AccountService;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +23,17 @@ public class DbManager {
     private static final Logger log = LogManager.getLogger(DbManager.class);
 
     private static final SimpleDateFormat fileDateFormat = new SimpleDateFormat("dd.MM.yyyy_HHmmssSSS");
-    private static final ConcurrentLinkedQueue<Trw> queue = new ConcurrentLinkedQueue<>();
+    private static final ConcurrentLinkedQueue<TransactionRequestW> queue = new ConcurrentLinkedQueue<>();
+
+    private class TransactionRequestW {
+        TransactionRequest request;
+        boolean result;
+
+        public TransactionRequestW(TransactionRequest request, boolean result) {
+            this.request = request;
+            this.result = result;
+        }
+    }
 
     private static String fileName = "data/transaction_" + fileDateFormat.format(new Date()) + ".log";
 
@@ -62,25 +71,16 @@ public class DbManager {
             while (init) {
                 Thread.sleep(interval);
                 if (service != null && !threadDisable && queue.size() > 0) {
-                    boolean result;
-                    int count = 0;
-                    List<Trw> list = new ArrayList<>();
+                    boolean result = true;
                     try {
                         for (int i = 0; i < 1000; i++) {
-                            Trw req = queue.poll();
+                            TransactionRequestW req = queue.poll();
                             if (req == null || threadDisable) break;
-                            list.add(req);
-                            //TransactionRequest request = req.request;
-                            //result = result & service.updateAccountHistory(request.getAccountId(), request.getDateTime(), request.getAmount(), request.getType(), req.result, request.getTransactionId());
+                            TransactionRequest request = req.request;
+                            result = result & service.updateAccountHistory(request.getAccountId(), request.getDateTime(), request.getAmount(), request.getType(),
+                                    req.result, request.getTransactionId());
                         }
-                        count = service.updateAccountHistory(list);
-                        result = count > 0;
                     } catch (Exception e) {
-
-                        if (count < list.size()) {
-                            queue.addAll(list.subList(count, list.size()));
-                        }
-
                         result = false;
                         log.error("Problem for save history: " + e);
                         e.printStackTrace();
@@ -104,7 +104,7 @@ public class DbManager {
     }
 
     public void addRequest(TransactionRequest request, boolean result) {
-        queue.add(new Trw(request, result));
+        queue.add(new TransactionRequestW(request, result));
     }
 
     public void setThreadDisable(boolean threadDisable) {
